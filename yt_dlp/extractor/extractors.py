@@ -1552,6 +1552,7 @@ from .tvplay import (
     TVPlayHomeIE,
 )
 from .tvplayer import TVPlayerIE
+from .twc import TWCIE
 from .tweakers import TweakersIE
 from .twentyfourvideo import TwentyFourVideoIE
 from .twentymin import TwentyMinutenIE
