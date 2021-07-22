@@ -1649,6 +1649,7 @@ from .vidio import (
     VidioLiveIE
 )
 from .vidlii import VidLiiIE
+from .vidlox import VIDLOXIE
 from .vier import VierIE, VierVideosIE
 from .viewlift import (
     ViewLiftIE,
