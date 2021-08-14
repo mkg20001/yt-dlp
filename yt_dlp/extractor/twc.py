@@ -1,19 +1,36 @@
 # coding: utf-8
 from __future__ import unicode_literals
 
+from ..utils import (
+    int_or_none,
+)
+import re
 from .common import InfoExtractor
 from .openload import PhantomJSwrapper
 
 
+def extract_season_episode (self, title):
+    season = self._search_regex(
+        r'Season[ -_]*(?P<season>\d+)',
+        title, 'season', group='season', fatal=False
+    )
+
+    episode = self._search_regex(
+        r'Episode[ -_]*(?P<episode>\d+)',
+        title, 'episode', group='episode', fatal=False
+    )
+
+    return (int_or_none(season), int_or_none(episode))
+
 class TWCIE(InfoExtractor):
     IE_NAME = 'The Watch Cartoon Online'
     BASE_URL = 'https://www.thewatchcartoononline.tv'
-    _VALID_URL = r'https?://(www\.)?thewatchcartoononline\.tv/(?P<id>[a-z0-9-]+)'
+    _VALID_URL = r'^https?://(www\.)?thewatchcartoononline\.tv/(?P<id>[a-z0-9-]+)$'
     _TEST = {
-        'url': 'https://www.thewatchcartoononline.tv/young-robin-hood-episode-1-the-wild-boar-of-sherwood',
+        'url': 'https://www.thewatchcartoononline.tv/the-legend-of-korra-season-3-episode-12-enter-the-void-2',
         'info_dict': {
-            'id': 'young-robin-hood-episode-1-the-wild-boar-of-sherwood',
-            'title': 'md5:21cac98ed9d84ba4485cc038f4830c3a',
+            'id': 'the-legend-of-korra-season-3-episode-12-enter-the-void-2',
+            'title': 'md5:05712247fe2699cfb6c77a77cacf7916',
             'ext': 'mp4',
         },
     }
@@ -97,9 +114,56 @@ class TWCIE(InfoExtractor):
             r'<title>Watch (?P<title>.+)<\/title>',
             webpage, 'title', group='title')
 
+        (series, seriesname) = self._search_regex(
+            r'href="(?P<series>.+)" rel="category tag">(?P<seriesname>.+)</a>',
+            webpage, 'series', group=('series', 'seriesname'), fatal=False
+        )
+
+        (season, episode) = extract_season_episode(self, title)
+
         return {
             'id': video_id,
             'title': title,
             'formats': formats,
-            'headers': headers
+            'headers': headers,
+            'series': series,
+            'series_title': seriesname,
+            'season_number': season,
+            'episode_number': episode
         }
+
+class TWCSeriesIE(InfoExtractor):
+    IE_NAME = 'The Watch Cartoon Online Series'
+    BASE_URL = 'https://www.thewatchcartoononline.tv/anime'
+    _VALID_URL = r'^https?://(www\.)?thewatchcartoononline\.tv/anime/(?P<id>[a-z0-9-]+)$'
+    _TEST = {
+        'url': 'https://www.thewatchcartoononline.tv/anime/the-legend-of-korra',
+        'playlist_mincount': 10,
+        'info_dict': {
+            'id': 'the-legend-of-korra',
+            'title': 'md5:2350b947e7442d8c89a5cf8956bbf7ed',
+            'description': 'md5:6f42d929c2ba6504984ac04c468d92a5',
+        },
+    }
+
+    def _real_extract(self, url):
+        anime_id = self._match_id(url)
+        webpage = self._download_webpage('https://thewatchcartoononline.tv/anime/%s' % anime_id, anime_id)
+
+        title = self._search_regex(
+            r'h1-tag"><a href=".+">(?P<title>.+)</a></div>',
+            webpage, 'title', group='title', fatal=False
+        )
+
+        description = self._search_regex(
+            r'</h3>\n\n<p>(?P<description>.+)</p>',
+            webpage, 'description', group='description', fatal=False
+        )
+
+        return self.playlist_result(tuple(self.url_result(
+                match.group('url'), ie=TWCIE.ie_key(),
+                video_id=TWCIE._match_id(match.group('url')),
+                video_title=match.group('title')
+            )
+            for match in re.finditer(r'<a href="(?P<url>.+)" rel="bookmark" title=".+" class="sonra">(?P<title>.+)</a>', webpage)
+        ), playlist_id=anime_id, playlist_title=title, playlist_description=description)
